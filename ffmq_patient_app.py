@@ -1,109 +1,82 @@
 import streamlit as st
+from fpdf import FPDF
+import io
 
 st.set_page_config(page_title="Mindfulness Self-Check", layout="centered")
 
-# ---------------------------
-# Data
-# ---------------------------
-questions = [
-   "I notice how foods and drinks affect my thoughts, bodily sensations, and emotions.",
-   "I pay attention to sensations, such as the wind in my hair or the sun on my face.",
-   "I notice visual elements in the environment, such as colors or shapes.",
-   "I am good at finding words to describe my feelings.",
-   "I can easily put my beliefs, opinions, and expectations into words.",
-   "Even when I am upset, I can find words to describe how I am feeling.",
-   "I find myself doing things without paying attention.",
-   "I rush through activities without being really attentive to them.",
-   "I do jobs or tasks automatically, without being aware of what I am doing.",
-   "I tell myself that I shouldn’t be feeling the way I’m feeling.",
-   "I make judgments about whether my thoughts are good or bad.",
-   "I think some of my emotions are bad or inappropriate and I shouldn’t feel them.",
-   "I notice distressing thoughts or images and let them go.",
-   "I watch my feelings without getting lost in them.",
-   "I can step back from my thoughts and feelings and observe them without reacting."
-]
+st.title("Mindfulness Self-Check (FFMQ-15)")
 
-reverse_items = [6, 7, 8, 9, 10, 11]  # zero-based index
+st.write("Please rate each statement from 1 (Never) to 5 (Very Often).")
 
-scale = {
-   1: "Never or very rarely",
-   2: "Rarely",
-   3: "Sometimes",
-   4: "Often",
-   5: "Very often or always"
+# 질문 리스트
+questions = {
+   "Observing": [
+       "1. I notice how foods and drinks affect my thoughts and body.",
+       "2. I pay attention to sensations like the wind or sun on my face.",
+       "3. I notice visual elements like colors and shapes in nature."
+   ],
+   "Describing": [
+       "4. I am good at finding words to describe my feelings.",
+       "5. I can easily put my beliefs and opinions into words.",
+       "6. Even when upset, I can find words to express my feelings."
+   ],
+   "Awareness": [
+       "7. I find myself doing things without paying attention. (*)",
+       "8. I rush through activities without being attentive. (*)",
+       "9. I do tasks automatically without being aware of them. (*)"
+   ],
+   "Non-Judging": [
+       "10. I tell myself I shouldn’t be feeling the way I’m feeling. (*)",
+       "11. I make judgments about whether my thoughts are good/bad. (*)",
+       "12. I think some of my emotions are inappropriate. (*)"
+   ],
+   "Non-Reactivity": [
+       "13. I notice distressing thoughts and just let them go.",
+       "14. I watch my feelings without getting lost in them.",
+       "15. I step back from thoughts and aware of them without reacting."
+   ]
 }
 
-# ---------------------------
-# UI Flow
-# ---------------------------
-st.title("Mindfulness Self-Check")
-st.write("A brief self-assessment to understand your current awareness and stress response.")
-st.write("⏱ Takes about **2–3 minutes**")
+reverse_categories = ["Awareness", "Non-Judging"]  # Reverse scoring categories
 
-responses = []
+# 사용자 점수 입력
+user_scores = {}
+for cat, qs in questions.items():
+   st.subheader(cat)
+   for q in qs:
+       user_scores[q] = st.slider(q, 1, 5, 3)
 
-st.divider()
+# 점수 계산
+def calculate_score(scores):
+   total = 0
+   for q, val in scores.items():
+       for cat in reverse_categories:
+           if q in questions[cat]:
+               val = 6 - val  # Reverse scoring
+       total += val
+   avg = round(total / 15, 2)
+   return avg
 
-for i, q in enumerate(questions):
-   st.subheader(f"Question {i+1} of 15")
-   response = st.radio(
-       q,
-       options=list(scale.keys()),
-       format_func=lambda x: f"{x} — {scale[x]}",
-       key=f"q{i}"
-   )
-   responses.append(response)
+if st.button("Submit"):
+   avg_score = calculate_score(user_scores)
+   st.success(f"Your Mindfulness Average Score: {avg_score} / 5")
 
-# ---------------------------
-# Scoring
-# ---------------------------
-if st.button("View My Results"):
-   scores = []
-   for i, r in enumerate(responses):
-       if i in reverse_items:
-           scores.append(6 - r)
-       else:
-           scores.append(r)
+   # PDF 생성
+   pdf = FPDF()
+   pdf.add_page()
+   pdf.set_font("Arial", "B", 16)
+   pdf.cell(0, 10, "Mindfulness Self-Check Result", ln=True, align="C")
+   pdf.ln(10)
+   pdf.set_font("Arial", "", 12)
+   for cat, qs in questions.items():
+       pdf.cell(0, 8, cat, ln=True)
+       for q in qs:
+           pdf.cell(0, 8, f"{q} - {user_scores[q]}", ln=True)
+       pdf.ln(2)
+   pdf.cell(0, 8, f"Mindfulness Average Score: {avg_score} / 5", ln=True)
 
-   total_score = round(sum(scores) / 15, 2)
+   # PDF 다운로드 버튼
+   pdf_buffer = io.BytesIO()
+   pdf.output(pdf_buffer)
+   st.download_button("Download PDF Result", pdf_buffer, file_name="Mindfulness_Result.pdf")
 
-   st.divider()
-   st.header("Your Mindfulness Snapshot")
-
-   st.metric(label="Overall Awareness Level", value=f"{total_score} / 5")
-
-   st.write(
-       "This score suggests that when life feels demanding, your attention may naturally drift "
-       "away from the present moment. This is a common and very workable pattern."
-   )
-
-   st.subheader("What You’re Already Doing Well")
-   st.write(
-       "You show an ability to notice physical sensations and experiences. "
-       "This awareness provides a strong foundation for building greater calm and clarity."
-   )
-
-   st.subheader("Areas That May Benefit From Gentle Support")
-   st.write(
-       "- Staying present during everyday activities\n"
-       "- Being less hard on yourself emotionally"
-   )
-
-   st.subheader("Personalized Practices")
-
-   st.markdown("**Body Awareness (2 minutes)**")
-   st.write(
-       "Gently bring your attention to physical sensations right now. "
-       "Notice contact, temperature, or movement—without trying to change anything."
-   )
-
-   st.markdown("**Creating Space Around Thoughts**")
-   st.write(
-       "Imagine each thought as a leaf floating down a stream. "
-       "You don’t need to follow it or stop it—just notice it pass."
-   )
-
-   st.caption(
-       "This self-check is designed to support reflection and care. "
-       "It does not provide a medical diagnosis."
-   )
